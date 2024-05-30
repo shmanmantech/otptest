@@ -8,7 +8,7 @@ app.listen(PORT, () => {
 
 app.get("/checkstatus", (req, res) => {
    const status = {
-      "Status": "Alive"
+      "Status": "Alive1"
    };
    
    res.send(status);
