@@ -169,7 +169,12 @@ async function generateOTP(email,res)
 {
 	//res.send("generating otp");
 	var curOtp = await get3Tempratures(res);
-	res.send("OTP generated for user: " +email + " is " + curOtp);
+	
+	const data = {
+      "OTP": curOtp,
+	  "Email": email
+   };
+	res.send(data);
 	sendOTPEmail(email,curOtp);
 }
 
