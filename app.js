@@ -224,7 +224,8 @@ async function generateOTP(email,res)
 {
 	//res.send("generating otp");
 	var curOtp = await get3Tempratures(res);
-	res.send("OTP generated for user: " +email + " is " + curOtp);
+	var data ={"OTP" : curOtp, "email" :email}
+	res.send(data);
 	updateOTP(curOtp,email);
 	sendOTPEmail(email,curOtp);
 }
