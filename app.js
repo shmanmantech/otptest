@@ -1,12 +1,17 @@
-const express = require('express');
-const http = require("http");
-const nodemailer = require('nodemailer');
+import express from 'express';
+import http from 'http';
+import nodemailer from 'nodemailer';
+import sqlite3 from 'sqlite3';
+const sqlite = sqlite3.verbose();
+import db from './myDb.js';
+
+
 
 
 
 const app = express ();
 app.use(express.json());
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log("I'm listening in port:", PORT);
 });
@@ -32,9 +37,26 @@ var cities = new Array();
 cities = strCities.split(',').map(str => str.trim());
 
 app.get('/getotp/:email', (req, res) => {
-	
+	console.log(db);
 	var curOtp ="NA";	
     const curEmail = req.params.email;
+	
+	
+	getUserByEmail(curEmail)
+    .then((users) => {
+		console.log('Selected rows:', users);
+		var userexists = users.length > 0;
+	
+	if(userexists==0){
+		insertUser(curEmail);
+	}
+        
+    })
+    .catch((error) => {
+        console.error('Error fetching data:', error);
+    });
+	
+	//insertUser(curEmail);
    // res.send(`User Email is: ${curEmail}`);
 	//todo:
 	//generate otp
@@ -46,6 +68,39 @@ app.get('/getotp/:email', (req, res) => {
 	
 });
 
+app.get('/checkotp/:email/:otp', (req, res) => {
+	
+	//get otp for email in db
+	
+	getUserByEmail(req.params.email)
+    .then((users) => {
+		console.log('Selected rows:', users);
+		var userexists = users.length > 0;
+	var result = {"message" : ""}
+	if(userexists==1){	
+		if(users[0].OTP == req.params.otp){
+			
+			
+			
+			result.message = "Exact OTP!"
+			res.send(result);
+		}
+		else{
+			result.message = "Wrong OTP!"
+			res.send(result);
+	}
+	}else{
+			result.message = "User Not Exist"
+			res.send(result);
+	}
+        
+    })
+    .catch((error) => {
+        console.error('Error fetching data:', error);
+    });
+	
+}
+);
 //TaRgIL28$*
 /*  Funcs */
 
@@ -169,12 +224,138 @@ async function generateOTP(email,res)
 {
 	//res.send("generating otp");
 	var curOtp = await get3Tempratures(res);
-	
-	const data = {
-      "OTP": curOtp,
-	  "Email": email
-   };
-	res.send(data);
+	res.send("OTP generated for user: " +email + " is " + curOtp);
+	updateOTP(curOtp,email);
 	sendOTPEmail(email,curOtp);
 }
+function insertUser(email)
+{
+	const db = new sqlite3.Database('./myDB.db', (err) => {
+    if (err) {
+        return console.error(err.message);
+    }
+    console.log('Connected to the SQLite database.');
+	console.log(db);
+});
+
+const insertUser = `INSERT INTO users (email) VALUES (?)`;
+
+// Data to be inserted
+const userData = [email];
+
+db.run(insertUser, userData, function(err) {
+    if (err) {
+        return console.error(err.message);
+    }
+    console.log(`A row has been inserted with rowid ${this.lastID}`);
+});
+
+db.close((err) => {
+    if (err) {
+        return console.error(err.message);
+    }
+    console.log('Closed the database connection.');
+});
+}
+
+function getUser(email)
+{
+	
+	const db = new sqlite3.Database('./myDB.db', (err) => {
+    if (err) {
+        return console.error(err.message);
+    }
+    console.log('Connected to the SQLite database.');
+	console.log(db);
+});
+	
+	const selectQuery = `SELECT * FROM users where email = ?`;
+
+db.all(selectQuery, [email], (err, rows) => {
+    if (err) {
+        throw err;
+    }
+    console.log('Data in users table:');
+	if(rows.length > 0){
+		return 1;
+	}else{
+		return 0;
+	}
+    rows.forEach((row) => {
+        console.log(`${row.id}:  ${row.email}`);
+    });
+});
+
+db.close((err) => {
+    if (err) {
+        return console.error(err.message);
+    }
+    console.log('Closed the database connection.');
+});
+	
+}
+
+ function getUserByEmail(email) {
+    const db = openDatabase();
+
+    return new Promise((resolve, reject) => {
+        const selectQuery = `SELECT * FROM users WHERE email = ?`;
+        
+        db.all(selectQuery, [email], (err, rows) => {
+            if (err) {
+                reject(err);
+            } else {
+                resolve(rows);
+            }
+
+            // Close the database connection
+            db.close((closeErr) => {
+                if (closeErr) {
+                    console.error(closeErr.message);
+                }
+                console.log('Closed the database connection.');
+            });
+        });
+    });
+}
+
+
+
+
+function updateOTP(otp, email) {
+    const db = openDatabase();
+
+    return new Promise((resolve, reject) => {
+        const updateQuery = `UPDATE users SET OTP = ? , Created = ? WHERE email = ?`;
+var date = new Date().toLocaleTimeString(); 
+        db.run(updateQuery, [otp,date ,email], function (err) {
+            if (err) {
+                reject(err);
+            } else {
+                resolve(`Rows updated: ${this.changes}`);
+            }
+
+            // Close the database connection
+            db.close((closeErr) => {
+                if (closeErr) {
+                    console.error(closeErr.message);
+                }
+                console.log('Closed the database connection.');
+            });
+        });
+    });
+}
+
+
+function openDatabase(){
+		const db = new sqlite3.Database('./myDB.db', (err) => {
+    if (err) {
+        return console.error(err.message);
+    }
+    console.log('Connected to the SQLite database.');
+	console.log(db);
+});
+return db;
+}
+
 
